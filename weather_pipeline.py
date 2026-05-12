@@ -103,7 +103,7 @@ class WeatherCollector:
         weather_data = self.fetch_weather(lat, lon)
 
         now = datetime.now()
-        raw_path = self.raw_folder / f"{city}_{now.strftime('%Y-%m-%d')}_raw.json"
+        raw_path = self.raw_folder / f"{city.replace(' ', '_').lower()}_{now.strftime('%Y-%m-%d')}_raw.json"
 
         with open(raw_path, "w") as f:
             json.dump(weather_data, f, indent=4)
@@ -161,9 +161,42 @@ class WeatherCollector:
             self.logger.error(f"Błąd zapisu do bazy: {e}", exc_info=True)
 
 
+def setup_logging(with_file: bool = False) -> None:
+    handlers = [logging.StreamHandler()]
+
+    if with_file:
+        handlers.append(logging.FileHandler("pipeline.log", encoding="utf-8"))
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=handlers,
+        force=True,
+    )
+
+
 if __name__ == "__main__":
-    with open("config.yaml", "r") as f:
-        config = yaml.safe_load(f)
+    setup_logging(with_file=False)
+    startup_logger = logging.getLogger("startup")
+
+    try:
+        with open("config.yaml", "r") as f:
+            config = yaml.safe_load(f)
+    except FileNotFoundError:
+        startup_logger.error("Nie znaleziono pliku config.yaml")
+        exit(1)
+    except yaml.YAMLError as e:
+        startup_logger.error(f"Nieprawidłowy format config.yaml: {e}")
+        exit(1)
+
+    required_keys = ["cities", "api", "database", "storage"]
+    for key in required_keys:
+        if key not in config:
+            startup_logger.error(f"Brakuje sekcji '{key}' w config.yaml")
+            exit(1)
+
+    setup_logging(with_file=True)
 
     engine = create_engine(
         f"sqlite:///{config['database']['path']}", echo=False
@@ -174,6 +207,10 @@ if __name__ == "__main__":
         db_engine=engine,
         config=config,
     )
+
+    if collector.api_key is None:
+        startup_logger.error("Brak klucza API. Ustaw MY_API_KEY w pliku .env")
+        exit(1)
 
     for city in config["cities"]:
         collector.run_pipeline(city)
