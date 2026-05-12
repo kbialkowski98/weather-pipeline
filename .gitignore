@@ -1,0 +1,5 @@
+.env
+storage/
+pipeline.log
+weather_warehouse.db
+__pycache__/

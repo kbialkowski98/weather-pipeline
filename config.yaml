@@ -1,0 +1,14 @@
+cities:
+  - Warsaw
+  - Berlin
+  - London
+
+api:
+  units: metric
+  limit: 1
+
+database:
+  path: weather_warehouse.db
+
+storage:
+  raw_folder: /content/drive/MyDrive/weather_pipeline/storage/raw
