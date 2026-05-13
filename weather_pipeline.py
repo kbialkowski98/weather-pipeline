@@ -5,25 +5,15 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-import yaml
 import pandas as pd
+import pyarrow
 import requests
+import yaml
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
 
 load_dotenv()
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[
-        logging.FileHandler("pipeline.log", encoding="utf-8"),
-        logging.StreamHandler(),
-    ],
-    force=True,
-)
 
 
 class WeatherCollector:
@@ -37,6 +27,10 @@ class WeatherCollector:
         self.logger = logging.getLogger(__name__)
         self.raw_folder = Path(self.config["storage"]["raw_folder"])
         self.raw_folder.mkdir(parents=True, exist_ok=True)
+        self.gold_folder = Path(self.config["storage"]["gold_parquet_path"])
+        self.gold_folder.mkdir(parents=True, exist_ok=True)
+        self.csv_folder = Path(self.config["storage"]["csv_path"])
+        self.csv_folder.mkdir(parents=True, exist_ok=True)
 
     def get_coords(self, city_name: str) -> tuple[float | None, float | None]:
         params = {
@@ -103,7 +97,8 @@ class WeatherCollector:
         weather_data = self.fetch_weather(lat, lon)
 
         now = datetime.now()
-        raw_path = self.raw_folder / f"{city.replace(' ', '_').lower()}_{now.strftime('%Y-%m-%d')}_raw.json"
+        city_slug = city.replace(" ", "_").lower()
+        raw_path = self.raw_folder / f"{city_slug}_{now.strftime('%Y-%m-%d')}_raw.json"
 
         with open(raw_path, "w") as f:
             json.dump(weather_data, f, indent=4)
@@ -112,7 +107,15 @@ class WeatherCollector:
 
         weather_data_transformed = self.transform_data(weather_data)
 
-        self.load_to_db(weather_data_transformed)
+        if self.config["pipeline_settings"]["save_to_sql"]:
+            self.load_to_db(weather_data_transformed)
+
+        if self.config["pipeline_settings"]["save_to_parquet"]:
+            self.save_to_parquet(weather_data_transformed, city_slug)
+
+        if self.config["pipeline_settings"]["save_to_csv"]:
+            self.save_to_csv(weather_data_transformed)
+
 
         return weather_data_transformed
 
@@ -148,6 +151,7 @@ class WeatherCollector:
 
     def load_to_db(self, transformed_data: dict) -> None:
         if not transformed_data:
+            self.logger.warning("Brak danych dla metody: load_to_db")
             return
 
         try:
@@ -159,6 +163,55 @@ class WeatherCollector:
 
         except Exception as e:
             self.logger.error(f"Błąd zapisu do bazy: {e}", exc_info=True)
+
+    def save_to_parquet(self, transformed_data: dict, city: str) -> None:
+        if not transformed_data:
+            self.logger.warning("Brak danych dla metody: save_to_parquet")
+            return
+
+        try:
+            now = datetime.now()
+
+            partition_folder = self.gold_folder/f"year={now.year}"/f"month={now.month:02d}"
+
+            partition_folder.mkdir(parents=True, exist_ok=True)
+
+            parquet_path = partition_folder/f"{city}.parquet"
+            df_new = pd.DataFrame([transformed_data])
+
+            if parquet_path.exists():
+                df_existing = pd.read_parquet(parquet_path)
+                df = pd.concat([df_existing, df_new], ignore_index=True)
+            else:
+                df = df_new
+
+            df = df.drop_duplicates(subset=["city", "timestamp"])
+
+            df.to_parquet(parquet_path, index=False)
+
+            self.logger.info(f"Dane dla {transformed_data.get('city')} zapisane do parquet.")
+
+        except Exception as e:
+            self.logger.error(f"Błąd zapisu do parquet: {e}", exc_info=True)
+
+    def save_to_csv(self, transformed_data: dict) -> None:
+        if not transformed_data:
+            self.logger.warning("Brak danych dla metody: save_to_csv")
+            return
+
+        try:
+            csv_path = self.csv_folder/f"result.csv"
+
+            file_exists = csv_path.exists()
+            pd.DataFrame([transformed_data]).to_csv(
+                csv_path, 
+                index=False, 
+                mode='a', 
+                header=not file_exists 
+                )
+
+        except Exception as e:
+            self.logger.error(f"Błąd zapisu do csv: {e}", exc_info=True)
 
 
 def setup_logging(with_file: bool = False) -> None:
@@ -190,7 +243,7 @@ if __name__ == "__main__":
         startup_logger.error(f"Nieprawidłowy format config.yaml: {e}")
         exit(1)
 
-    required_keys = ["cities", "api", "database", "storage"]
+    required_keys = ["cities", "api", "storage", "pipeline_settings"]
     for key in required_keys:
         if key not in config:
             startup_logger.error(f"Brakuje sekcji '{key}' w config.yaml")
@@ -199,7 +252,7 @@ if __name__ == "__main__":
     setup_logging(with_file=True)
 
     engine = create_engine(
-        f"sqlite:///{config['database']['path']}", echo=False
+        f"sqlite:///{config['storage']['db_path']}", echo=False
     )
 
     collector = WeatherCollector(
