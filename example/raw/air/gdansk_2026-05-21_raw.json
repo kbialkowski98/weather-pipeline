@@ -1,0 +1,45 @@
+{
+    "coord": {
+        "lon": 18.613,
+        "lat": 54.3707
+    },
+    "weather": [
+        {
+            "id": 803,
+            "main": "Clouds",
+            "description": "broken clouds",
+            "icon": "04d"
+        }
+    ],
+    "base": "stations",
+    "main": {
+        "temp": 18.07,
+        "feels_like": 17.6,
+        "temp_min": 17.79,
+        "temp_max": 19.63,
+        "pressure": 1024,
+        "humidity": 64,
+        "sea_level": 1024,
+        "grnd_level": 1017
+    },
+    "visibility": 10000,
+    "wind": {
+        "speed": 7.2,
+        "deg": 300
+    },
+    "clouds": {
+        "all": 75
+    },
+    "dt": 1779367051,
+    "sys": {
+        "type": 1,
+        "id": 1696,
+        "country": "PL",
+        "sunrise": 1779330713,
+        "sunset": 1779389560
+    },
+    "timezone": 7200,
+    "id": 3099434,
+    "name": "Gda\u0144sk",
+    "cod": 200
+}

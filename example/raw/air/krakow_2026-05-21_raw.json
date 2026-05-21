@@ -1,0 +1,46 @@
+{
+    "coord": {
+        "lon": 19.9972,
+        "lat": 50.0469
+    },
+    "weather": [
+        {
+            "id": 802,
+            "main": "Clouds",
+            "description": "scattered clouds",
+            "icon": "03d"
+        }
+    ],
+    "base": "stations",
+    "main": {
+        "temp": 20.39,
+        "feels_like": 19.11,
+        "temp_min": 20.11,
+        "temp_max": 21.32,
+        "pressure": 1023,
+        "humidity": 24,
+        "sea_level": 1023,
+        "grnd_level": 994
+    },
+    "visibility": 10000,
+    "wind": {
+        "speed": 4.85,
+        "deg": 327,
+        "gust": 6.2
+    },
+    "clouds": {
+        "all": 31
+    },
+    "dt": 1779366805,
+    "sys": {
+        "type": 2,
+        "id": 2090246,
+        "country": "PL",
+        "sunrise": 1779331596,
+        "sunset": 1779388012
+    },
+    "timezone": 7200,
+    "id": 3100883,
+    "name": "D\u0105bie",
+    "cod": 200
+}
