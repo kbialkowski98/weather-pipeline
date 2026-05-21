@@ -1,0 +1,4 @@
+city,lon,lat,weather,conditions,temp_c,temp_f,station_name,pm10,pm25,timestamp,extracted_at
+Warsaw,21.0714,52.2337,Clouds,few clouds,23.66,74.588,"Toruń, ul. Wały gen. Sikorskiego",26.3,,2026-05-21 12:37:25,2026-05-21 12:37:27
+Dąbie,19.9972,50.0469,Clouds,scattered clouds,20.39,68.702,"Oława, ul. Żołnierzy Armii Krajowej",12.0,6.2,2026-05-21 12:33:25,2026-05-21 12:37:30
+Gdańsk,18.613,54.3707,Clouds,broken clouds,18.07,64.52600000000001,"Grudziądz, ul. Piłsudskiego",22.1,,2026-05-21 12:37:31,2026-05-21 12:37:33
