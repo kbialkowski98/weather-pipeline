@@ -1,0 +1,33 @@
+2026-05-21 12:37:25 | INFO     | __main__ | API geo odpowiada
+2026-05-21 12:37:25 | INFO     | __main__ | Współrzędne miasta Warsaw: 52.2337172, 21.071432235636493
+2026-05-21 12:37:25 | INFO     | __main__ | API weather odpowiada
+2026-05-21 12:37:26 | INFO     | __main__ | Najbliższa stacja GIOŚ: Toruń, ul. Wały gen. Sikorskiego
+2026-05-21 12:37:26 | INFO     | __main__ | Znaleziono sensorów: ['PM10']
+2026-05-21 12:37:27 | INFO     | __main__ | Surowe dane zapisano do: storage/raw/weather/warsaw_2026-05-21_raw.json
+2026-05-21 12:37:27 | INFO     | __main__ | Surowe dane air quality zapisano do: storage/raw/air/warsaw_2026-05-21_raw.json
+2026-05-21 12:37:27 | INFO     | __main__ | Udana transformacja, JSON: {'city': 'Warsaw', 'lon': 21.0714, 'lat': 52.2337, 'weather': 'Clouds', 'conditions': 'few clouds', 'temp_c': 23.66, 'temp_f': 74.588, 'station_name': 'Toruń, ul. Wały gen. Sikorskiego', 'pm10': 26.3, 'pm25': None, 'timestamp': '2026-05-21 12:37:25', 'extracted_at': '2026-05-21 12:37:27'}
+2026-05-21 12:37:27 | INFO     | __main__ | Dane dla Warsaw zapisane do bazy.
+2026-05-21 12:37:27 | INFO     | __main__ | Dane dla Warsaw zapisane do parquet.
+2026-05-21 12:37:27 | INFO     | __main__ | Dane dla Warsaw zapisane do CSV.
+2026-05-21 12:37:28 | INFO     | __main__ | API geo odpowiada
+2026-05-21 12:37:28 | INFO     | __main__ | Współrzędne miasta Krakow: 50.0469432, 19.997153435836697
+2026-05-21 12:37:28 | INFO     | __main__ | API weather odpowiada
+2026-05-21 12:37:29 | INFO     | __main__ | Najbliższa stacja GIOŚ: Oława, ul. Żołnierzy Armii Krajowej
+2026-05-21 12:37:29 | INFO     | __main__ | Znaleziono sensorów: ['PM10', 'PM10', 'PM2.5']
+2026-05-21 12:37:30 | INFO     | __main__ | Surowe dane zapisano do: storage/raw/weather/krakow_2026-05-21_raw.json
+2026-05-21 12:37:30 | INFO     | __main__ | Surowe dane air quality zapisano do: storage/raw/air/krakow_2026-05-21_raw.json
+2026-05-21 12:37:30 | INFO     | __main__ | Udana transformacja, JSON: {'city': 'Dąbie', 'lon': 19.9972, 'lat': 50.0469, 'weather': 'Clouds', 'conditions': 'scattered clouds', 'temp_c': 20.39, 'temp_f': 68.702, 'station_name': 'Oława, ul. Żołnierzy Armii Krajowej', 'pm10': 12.0, 'pm25': 6.2, 'timestamp': '2026-05-21 12:33:25', 'extracted_at': '2026-05-21 12:37:30'}
+2026-05-21 12:37:30 | INFO     | __main__ | Dane dla Dąbie zapisane do bazy.
+2026-05-21 12:37:30 | INFO     | __main__ | Dane dla Dąbie zapisane do parquet.
+2026-05-21 12:37:30 | INFO     | __main__ | Dane dla Dąbie zapisane do CSV.
+2026-05-21 12:37:31 | INFO     | __main__ | API geo odpowiada
+2026-05-21 12:37:31 | INFO     | __main__ | Współrzędne miasta Gdansk: 54.3706858, 18.61298210330077
+2026-05-21 12:37:31 | INFO     | __main__ | API weather odpowiada
+2026-05-21 12:37:32 | INFO     | __main__ | Najbliższa stacja GIOŚ: Grudziądz, ul. Piłsudskiego
+2026-05-21 12:37:32 | INFO     | __main__ | Znaleziono sensorów: ['PM10']
+2026-05-21 12:37:33 | INFO     | __main__ | Surowe dane zapisano do: storage/raw/weather/gdansk_2026-05-21_raw.json
+2026-05-21 12:37:33 | INFO     | __main__ | Surowe dane air quality zapisano do: storage/raw/air/gdansk_2026-05-21_raw.json
+2026-05-21 12:37:33 | INFO     | __main__ | Udana transformacja, JSON: {'city': 'Gdańsk', 'lon': 18.613, 'lat': 54.3707, 'weather': 'Clouds', 'conditions': 'broken clouds', 'temp_c': 18.07, 'temp_f': 64.52600000000001, 'station_name': 'Grudziądz, ul. Piłsudskiego', 'pm10': 22.1, 'pm25': None, 'timestamp': '2026-05-21 12:37:31', 'extracted_at': '2026-05-21 12:37:33'}
+2026-05-21 12:37:33 | INFO     | __main__ | Dane dla Gdańsk zapisane do bazy.
+2026-05-21 12:37:33 | INFO     | __main__ | Dane dla Gdańsk zapisane do parquet.
+2026-05-21 12:37:33 | INFO     | __main__ | Dane dla Gdańsk zapisane do CSV.
