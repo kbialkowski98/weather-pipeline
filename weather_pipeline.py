@@ -6,7 +6,6 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-import pyarrow
 import requests
 import yaml
 from dotenv import load_dotenv
@@ -22,15 +21,20 @@ class WeatherCollector:
         self.api_key = api_key
         self.base_url = "https://api.openweathermap.org/data/2.5/weather"
         self.geo_url = "http://api.openweathermap.org/geo/1.0/direct"
+        self.gios_url = "https://api.gios.gov.pl/pjp-api/v1/rest"
         self.engine = db_engine
         self.config = config
         self.logger = logging.getLogger(__name__)
-        self.raw_folder = Path(self.config["storage"]["raw_folder"])
-        self.raw_folder.mkdir(parents=True, exist_ok=True)
+        self.raw_folder_weather = Path(self.config["storage"]["raw_folder_weather"])
+        self.raw_folder_weather.mkdir(parents=True, exist_ok=True)
+        self.raw_folder_air = Path(self.config["storage"]["raw_folder_air"])
+        self.raw_folder_air.mkdir(parents=True, exist_ok=True)
         self.gold_folder = Path(self.config["storage"]["gold_parquet_path"])
         self.gold_folder.mkdir(parents=True, exist_ok=True)
         self.csv_folder = Path(self.config["storage"]["csv_path"])
         self.csv_folder.mkdir(parents=True, exist_ok=True)
+
+    # --- POGODA ---
 
     def get_coords(self, city_name: str) -> tuple[float | None, float | None]:
         params = {
@@ -83,6 +87,100 @@ class WeatherCollector:
             self.logger.error(f"Problem z API: {e}", exc_info=True)
             return None
 
+    # --- JAKOŚĆ POWIETRZA (GIOŚ) ---
+
+    def find_nearest_station(self, lat: float, lon: float) -> dict | None:
+        response = requests.get(f"{self.gios_url}/station/findAll")
+
+        if response.status_code != 200:
+            self.logger.warning(f"GIOŚ API niedostępne: HTTP {response.status_code}")
+            return None
+
+        stations = response.json()["Lista stacji pomiarowych"]
+
+        nearest = min(stations, key=lambda s: (
+            (float(s["WGS84 φ N"]) - lat) ** 2 + (float(s["WGS84 λ E"]) - lon) ** 2
+        ))
+
+        self.logger.info(f"Najbliższa stacja GIOŚ: {nearest['Nazwa stacji']}")
+        return nearest
+
+    def get_sensors(self, station_id: int) -> list:
+        response = requests.get(f"{self.gios_url}/station/sensors/{station_id}")
+
+        if response.status_code != 200:
+            self.logger.warning(f"Stacja {station_id} niedostępna: HTTP {response.status_code}")
+            return None
+
+        sensors = response.json()["Lista stanowisk pomiarowych dla podanej stacji"]
+
+        if "error_code" in sensors:
+            self.logger.warning(f"Stacja {station_id} niedostępna: {sensors.get('error_reason')}")
+            return None
+
+        wanted = {"PM10", "PM2.5"}
+        filtered = [s for s in sensors if s["Wskaźnik - kod"] in wanted]
+
+        self.logger.info(f"Znaleziono sensorów: {[s['Wskaźnik - kod'] for s in filtered]}")
+        return filtered
+
+    def fetch_air_quality(self, lat: float, lon: float) -> tuple[dict | None, dict | None] | None:
+        nearest = self.find_nearest_station(lat, lon)
+        if nearest is None:
+            return None, None
+
+        sensors = self.get_sensors(nearest["Identyfikator stacji"])
+        if not sensors:
+            return None, None
+
+        raw = {
+            "station": nearest,
+            "sensors": [],
+        }
+
+        result = {
+            "station_name": nearest["Nazwa stacji"],
+            "pm10": None,
+            "pm25": None,
+        }
+
+        for sensor in sensors:
+            if sensor["Wskaźnik - kod"] == "PM10" and result["pm10"] is not None:
+                continue
+            if sensor["Wskaźnik - kod"] == "PM2.5" and result["pm25"] is not None:
+                continue
+
+            response = requests.get(f"{self.gios_url}/data/getData/{sensor['Identyfikator stanowiska']}")
+
+            if response.status_code != 200:
+                self.logger.warning(f"Sensor {sensor['Identyfikator stanowiska']} niedostępny: HTTP {response.status_code}")
+                continue
+
+            data = response.json()
+
+            if "error_code" in data:
+                self.logger.warning(f"Sensor {sensor['Identyfikator stanowiska']} niedostępny: {data.get('error_reason')}")
+                continue
+
+            # raw
+            raw["sensors"].append({
+                "sensor_info": sensor,
+                "measurements": data.get("Lista danych pomiarowych", []),
+            })
+
+            # przetworzone
+            values = data.get("Lista danych pomiarowych", [])
+            value = next((v["Wartość"] for v in values if v.get("Wartość") is not None), None)
+
+            if sensor["Wskaźnik - kod"] == "PM10":
+                result["pm10"] = value
+            elif sensor["Wskaźnik - kod"] == "PM2.5":
+                result["pm25"] = value
+
+        return raw, result
+
+    # --- PIPELINE ---
+
     def run_pipeline(self, city: str) -> dict | None:
         lat, lon = self.get_coords(city)
 
@@ -95,17 +193,27 @@ class WeatherCollector:
         self.logger.info(f"Współrzędne miasta {city}: {lat}, {lon}")
 
         weather_data = self.fetch_weather(lat, lon)
+        air_raw, air_quality = self.fetch_air_quality(lat, lon)
 
         now = datetime.now()
         city_slug = city.replace(" ", "_").lower()
-        raw_path = self.raw_folder / f"{city_slug}_{now.strftime('%Y-%m-%d')}_raw.json"
+        
+        raw_path_wea = self.raw_folder_weather / f"{city_slug}_{now.strftime('%Y-%m-%d')}_raw.json"
 
-        with open(raw_path, "w") as f:
+        with open(raw_path_wea, "w") as f:
             json.dump(weather_data, f, indent=4)
 
-        self.logger.info(f"Surowe dane zapisano do: {raw_path}")
+        self.logger.info(f"Surowe dane zapisano do: {raw_path_wea}")
 
-        weather_data_transformed = self.transform_data(weather_data)
+        if air_raw:
+            air_raw_path = self.raw_folder_air / f"{city_slug}_{now.strftime('%Y-%m-%d')}_raw.json"
+
+            with open(air_raw_path, "w") as f:
+                json.dump(weather_data, f, indent=4)
+
+            self.logger.info(f"Surowe dane air quality zapisano do: {air_raw_path}")
+
+        weather_data_transformed = self.transform_data(weather_data, air_quality, now)
 
         if self.config["pipeline_settings"]["save_to_sql"]:
             self.load_to_db(weather_data_transformed)
@@ -116,10 +224,9 @@ class WeatherCollector:
         if self.config["pipeline_settings"]["save_to_csv"]:
             self.save_to_csv(weather_data_transformed)
 
-
         return weather_data_transformed
 
-    def transform_data(self, raw_data: dict) -> dict | None:
+    def transform_data(self, raw_data: dict, air_quality: dict | None = None, extracted_at: datetime | None = None) -> dict | None:
         if not raw_data:
             self.logger.error("Brak danych do transformacji")
             return None
@@ -136,10 +243,11 @@ class WeatherCollector:
                 "conditions": raw_data.get("weather", [{}])[0].get("description"),
                 "temp_c": temp_c,
                 "temp_f": temp_f,
-                "timestamp": datetime.fromtimestamp(raw_data.get("dt")).strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                ),
-                "extracted_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "station_name": air_quality.get("station_name") if air_quality else None,
+                "pm10": air_quality.get("pm10") if air_quality else None,
+                "pm25": air_quality.get("pm25") if air_quality else None,
+                "timestamp": datetime.fromtimestamp(raw_data.get("dt")).strftime("%Y-%m-%d %H:%M:%S"),
+                "extracted_at": (extracted_at or datetime.now()).strftime("%Y-%m-%d %H:%M:%S"),
             }
 
             self.logger.info(f"Udana transformacja, JSON: {transformed}")
@@ -148,6 +256,8 @@ class WeatherCollector:
         except Exception as e:
             self.logger.error(f"Problem z transformacją: {e}", exc_info=True)
             return None
+
+    # --- ZAPIS ---
 
     def load_to_db(self, transformed_data: dict) -> None:
         if not transformed_data:
@@ -164,19 +274,17 @@ class WeatherCollector:
         except Exception as e:
             self.logger.error(f"Błąd zapisu do bazy: {e}", exc_info=True)
 
-    def save_to_parquet(self, transformed_data: dict, city: str) -> None:
+    def save_to_parquet(self, transformed_data: dict, city_slug: str) -> None:
         if not transformed_data:
             self.logger.warning("Brak danych dla metody: save_to_parquet")
             return
 
         try:
             now = datetime.now()
-
-            partition_folder = self.gold_folder/f"year={now.year}"/f"month={now.month:02d}"
-
+            partition_folder = self.gold_folder / f"year={now.year}" / f"month={now.month:02d}"
             partition_folder.mkdir(parents=True, exist_ok=True)
 
-            parquet_path = partition_folder/f"{city}.parquet"
+            parquet_path = partition_folder / f"{city_slug}.parquet"
             df_new = pd.DataFrame([transformed_data])
 
             if parquet_path.exists():
@@ -200,18 +308,20 @@ class WeatherCollector:
             return
 
         try:
-            csv_path = self.csv_folder/f"result.csv"
-
+            csv_path = self.csv_folder / "result.csv"
             file_exists = csv_path.exists()
+
             pd.DataFrame([transformed_data]).to_csv(
-                csv_path, 
-                index=False, 
-                mode='a', 
-                header=not file_exists 
-                )
+                csv_path,
+                index=False,
+                mode="a",
+                header=not file_exists,
+            )
+
+            self.logger.info(f"Dane dla {transformed_data.get('city')} zapisane do CSV.")
 
         except Exception as e:
-            self.logger.error(f"Błąd zapisu do csv: {e}", exc_info=True)
+            self.logger.error(f"Błąd zapisu do CSV: {e}", exc_info=True)
 
 
 def setup_logging(with_file: bool = False) -> None:
