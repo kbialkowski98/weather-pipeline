@@ -1,14 +1,20 @@
 cities:
   - Warsaw
-  - Berlin
-  - London
+  - Krakow
+  - Gdansk
 
 api:
   units: metric
   limit: 1
 
-database:
-  path: weather_warehouse.db
-
 storage:
-  raw_folder: /content/drive/MyDrive/weather_pipeline/storage/raw
+  raw_folder_weather: storage/raw/weather
+  raw_folder_air: storage/raw/air
+  gold_parquet_path: storage/gold
+  csv_path: storage/csv
+  db_path: weather_warehouse.db
+
+pipeline_settings:
+  save_to_sql: true
+  save_to_parquet: true
+  save_to_csv: true
